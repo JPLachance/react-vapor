@@ -24,6 +24,7 @@ import {
     tableWithPredicate,
     tableWithSort,
     tableWithUrlState,
+    UrlUtils,
     withServerSideProcessing,
 } from 'react-vapor';
 import * as _ from 'underscore';
@@ -62,7 +63,7 @@ const renderHeader = () => (
         {({isLoading}) => (
             <thead>
                 <tr>
-                    <TableRowNumberHeader isLoading={isLoading} />
+                    <TableRowNumberHeader id="numHeader" isLoading={isLoading} />
                     <TableHeaderWithSort id="address.city" tableId={TableHOCServerExampleId} isLoading={isLoading}>
                         City
                     </TableHeaderWithSort>
@@ -77,7 +78,9 @@ const renderHeader = () => (
                     >
                         Username
                     </TableHeaderWithSort>
-                    <TableRowHeader isLoading={isLoading}>Date of Birth</TableRowHeader>
+                    <TableRowHeader id="dob" isLoading={isLoading}>
+                        Date of Birth
+                    </TableRowHeader>
                     <TableRowHeader isLoading={isLoading} />
                 </tr>
             </thead>
@@ -114,7 +117,7 @@ class TableExampleDisconnected extends React.PureComponent<TableHOCServerProps, 
         this.setState({...this.state, isLoading: true});
         window.setTimeout(
             () =>
-                this.props.fetch().done((data: any) => {
+                this.props.fetch().then((data: any) => {
                     this.setState({data, isLoading: false});
                 }),
             500
@@ -176,7 +179,7 @@ class TableExampleDisconnected extends React.PureComponent<TableHOCServerProps, 
 
 const TableHOCServer = connect(undefined, mapDispatchToProps)(withRouter(TableExampleDisconnected));
 
-const fetchData = (): IThunkAction => (dispatch: IDispatch, getState: () => IReactVaporState) => {
+const fetchData = (): IThunkAction => async (dispatch: IDispatch, getState: () => IReactVaporState) => {
     const compositeState: ITableHOCCompositeState = TableHOCUtils.getCompositeState(
         TableHOCServerExampleId,
         getState()
@@ -194,20 +197,27 @@ const fetchData = (): IThunkAction => (dispatch: IDispatch, getState: () => IRea
     _.each(compositeState.predicates, (predicate: {id: string; value: string}) => {
         params[predicate.id] = predicate.value;
     });
-    return $.get('https://jsonplaceholder.typicode.com/users', params).then((response: any[], status, request) => {
-        const count = request.getResponseHeader('x-total-count');
-        const users = _.map(response, (user: any) => ({
+
+    const query = UrlUtils.toQueryString(params);
+
+    try {
+        const res = await fetch(`https://jsonplaceholder.typicode.com/users?${query}`);
+        const count = (res.headers.has('x-total-count') && res.headers.get('x-total-count')) || null;
+        const data = await res.json();
+
+        const users = data.map((user: any) => ({
             city: user.address.city,
             username: user.username,
             email: user.email,
-            dateOfBirth: moment().subtract(user.address.city.length, 'years').toDate(), // fake a year of birth
+            dateOfBirth: moment('1995-12-25').toDate(), // fake a year of birth
         }));
+
         dispatch(TableWithPaginationActions.setCount(TableHOCServerExampleId, count as any));
-        return {
-            count,
-            users,
-        };
-    });
+
+        return {users, count};
+    } catch (error) {
+        throw error;
+    }
 };
 
 const TableHOCServerActions = {

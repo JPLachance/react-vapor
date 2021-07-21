@@ -1,11 +1,18 @@
 import * as React from 'react';
-import {TextLoadingPlaceholder} from '../loading/components/TextLoadingPlaceholder';
 
-export const TableRowHeader = ({isLoading, children}: {isLoading?: boolean; children?: React.ReactNode}) =>
-    isLoading ? (
-        <th>
-            <TextLoadingPlaceholder small />
+import {useCustomLayoutEffect} from './utils/TableHooks';
+
+interface TableRowHeaderProps {
+    id?: string;
+    isLoading?: boolean;
+}
+
+export const TableRowHeader: React.FC<TableRowHeaderProps> = ({isLoading, children}) => {
+    const {style, tableHeaderRef} = useCustomLayoutEffect(isLoading);
+
+    return (
+        <th ref={tableHeaderRef} style={style}>
+            {children}
         </th>
-    ) : (
-        <th>{children}</th>
     );
+};
